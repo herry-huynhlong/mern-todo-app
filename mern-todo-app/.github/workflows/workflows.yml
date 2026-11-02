@@ -1,0 +1,17 @@
+name: Workflow
+
+on:
+    push: 
+        branches: [main]
+
+env: 
+    abc: "Long"
+
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: check
+              run: ls -la
