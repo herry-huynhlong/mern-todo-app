@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS-22.0.0'
+        nodejs 'NodeJS-22'
     }
 
     options {
@@ -14,6 +14,7 @@ pipeline {
     environment {
         APP_NAME = 'mern-todo-backend'
         APP_DIR = 'mern-todo-app'
+        CI = 'false'
     }
 
     stages {
@@ -27,18 +28,19 @@ pipeline {
 
         stage('Check Environment') {
             steps {
-                echo '========== CHECK NODEJS =========='
+                echo '========== CHECK ENVIRONMENT =========='
 
                 sh '''
                     node --version
                     npm --version
+                    pm2 --version
                 '''
             }
         }
 
         stage('Install Backend Dependencies') {
             steps {
-                echo '========== INSTALL BACKEND =========='
+                echo '========== INSTALL BACKEND DEPENDENCIES =========='
 
                 dir("${APP_DIR}/backend") {
                     sh '''
@@ -54,11 +56,15 @@ pipeline {
 
         stage('Install Frontend Dependencies') {
             steps {
-                echo '========== INSTALL FRONTEND =========='
+                echo '========== INSTALL FRONTEND DEPENDENCIES =========='
 
                 dir("${APP_DIR}/frontend") {
                     sh '''
-                        npm ci
+                        if [ -f package-lock.json ]; then
+                            npm ci
+                        else
+                            npm install
+                        fi
                     '''
                 }
             }
@@ -66,7 +72,7 @@ pipeline {
 
         stage('Build Frontend') {
             steps {
-                echo '========== BUILD REACT =========='
+                echo '========== BUILD REACT FRONTEND =========='
 
                 dir("${APP_DIR}/frontend") {
                     sh '''
@@ -78,17 +84,15 @@ pipeline {
 
         stage('Deploy Backend') {
             steps {
-                echo '========== DEPLOY BACKEND =========='
+                echo '========== DEPLOY NODEJS BACKEND =========='
 
                 dir("${APP_DIR}/backend") {
                     sh '''
-                        if ! command -v pm2 >/dev/null 2>&1; then
-                            npm install -g pm2
-                        fi
-
-                        if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+                        if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
+                            echo "Restarting backend..."
                             pm2 restart "$APP_NAME" --update-env
                         else
+                            echo "Starting backend..."
                             pm2 start server.js --name "$APP_NAME"
                         fi
 
@@ -112,15 +116,20 @@ pipeline {
     post {
         success {
             echo '========================================'
-            echo 'BUILD AND DEPLOY SUCCESS!'
+            echo 'JENKINS PIPELINE SUCCESS!'
+            echo 'BACKEND DEPLOYED SUCCESSFULLY!'
             echo '========================================'
         }
 
         failure {
             echo '========================================'
-            echo 'PIPELINE FAILED!'
-            echo 'CHECK CONSOLE OUTPUT'
+            echo 'JENKINS PIPELINE FAILED!'
+            echo 'PLEASE CHECK CONSOLE OUTPUT'
             echo '========================================'
+        }
+
+        always {
+            echo '========== PIPELINE FINISHED =========='
         }
     }
 }
