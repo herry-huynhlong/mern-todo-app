@@ -16,3 +16,4 @@ jobs:
         steps:
             - name: check
               run: ls -la
+                    pwd 
