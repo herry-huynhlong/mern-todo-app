@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'NodeJS-22'
+    }
+
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -23,12 +27,11 @@ pipeline {
 
         stage('Check Environment') {
             steps {
-                echo '========== CHECK ENVIRONMENT =========='
+                echo '========== CHECK NODEJS =========='
 
                 sh '''
                     node --version
                     npm --version
-                    pm2 --version
                 '''
             }
         }
@@ -39,7 +42,11 @@ pipeline {
 
                 dir("${APP_DIR}/backend") {
                     sh '''
-                        npm ci || npm install
+                        if [ -f package-lock.json ]; then
+                            npm ci
+                        else
+                            npm install
+                        fi
                     '''
                 }
             }
@@ -51,7 +58,7 @@ pipeline {
 
                 dir("${APP_DIR}/frontend") {
                     sh '''
-                        npm ci || npm install
+                        npm ci
                     '''
                 }
             }
@@ -75,9 +82,15 @@ pipeline {
 
                 dir("${APP_DIR}/backend") {
                     sh '''
-                        pm2 describe "$APP_NAME" > /dev/null 2>&1 \
-                          && pm2 restart "$APP_NAME" --update-env \
-                          || pm2 start server.js --name "$APP_NAME"
+                        if ! command -v pm2 >/dev/null 2>&1; then
+                            npm install -g pm2
+                        fi
+
+                        if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+                            pm2 restart "$APP_NAME" --update-env
+                        else
+                            pm2 start server.js --name "$APP_NAME"
+                        fi
 
                         pm2 save
                     '''
