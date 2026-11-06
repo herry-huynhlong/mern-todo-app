@@ -123,7 +123,7 @@ pipeline {
 
         failure {
             echo '========================================'
-            echo 'JENKINS PIPELINE FAILED!'
+            echo 'JENKINS PIPELINE FAILE!'
             echo 'PLEASE CHECK CONSOLE OUTPUT'
             echo '========================================'
         }
