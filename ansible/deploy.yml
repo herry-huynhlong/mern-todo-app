@@ -1,0 +1,164 @@
+---
+- name: Deploy MERN Todo App to EC2
+  hosts: vps
+  become: true
+  gather_facts: true
+
+  vars:
+    app_dir: /home/ubuntu/mern-todo-app
+    app_owner: ubuntu
+    local_source: "{{ playbook_dir }}/../mern-todo-app"
+
+  pre_tasks:
+
+    - name: Check Docker
+      ansible.builtin.command:
+        cmd: docker --version
+      changed_when: false
+
+    - name: Check Docker Compose
+      ansible.builtin.command:
+        cmd: docker compose version
+      changed_when: false
+
+    - name: Check production environment file
+      ansible.builtin.stat:
+        path: "{{ app_dir }}/backend/.env"
+      register: backend_env
+
+    - name: Ensure production environment exists
+      ansible.builtin.assert:
+        that:
+          - backend_env.stat.exists
+          - backend_env.stat.isreg
+        fail_msg: "Backend .env is missing on EC2."
+
+    - name: Check source exists locally
+      ansible.builtin.stat:
+        path: "{{ local_source }}/backend/Dockerfile"
+      delegate_to: localhost
+      become: false
+      register: local_backend
+
+    - name: Verify local source
+      ansible.builtin.assert:
+        that:
+          - local_backend.stat.exists
+
+  tasks:
+
+    - name: Create application directories
+      ansible.builtin.file:
+        path: "{{ app_dir }}/{{ item }}"
+        state: directory
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        mode: "0755"
+      loop:
+        - backend
+        - frontend
+
+    - name: Synchronize backend source
+      ansible.posix.synchronize:
+        src: "{{ local_source }}/backend/"
+        dest: "{{ app_dir }}/backend/"
+        archive: true
+        owner: false
+        group: false
+        rsync_opts:
+          - "--exclude=.env"
+          - "--exclude=.env.*"
+          - "--exclude=node_modules"
+          - "--exclude=.git"
+      become: false
+
+    - name: Synchronize frontend source
+      ansible.posix.synchronize:
+        src: "{{ local_source }}/frontend/"
+        dest: "{{ app_dir }}/frontend/"
+        archive: true
+        owner: false
+        group: false
+        rsync_opts:
+          - "--exclude=.env"
+          - "--exclude=.env.*"
+          - "--exclude=node_modules"
+          - "--exclude=.git"
+      become: false
+
+    - name: Copy production Docker Compose
+      ansible.builtin.copy:
+        src: files/compose.production.yml
+        dest: "{{ app_dir }}/compose.production.yml"
+        owner: "{{ app_owner }}"
+        group: "{{ app_owner }}"
+        mode: "0644"
+
+    - name: Inspect MongoDB volume
+      ansible.builtin.command:
+        cmd: docker volume inspect mern_mongo_data
+      register: mongo_volume
+      changed_when: false
+      failed_when: false
+
+    - name: Create MongoDB volume if missing
+      ansible.builtin.command:
+        cmd: docker volume create mern_mongo_data
+      when: mongo_volume.rc != 0
+
+    - name: Inspect MERN network
+      ansible.builtin.command:
+        cmd: docker network inspect mern-network
+      register: mern_network
+      changed_when: false
+      failed_when: false
+
+    - name: Create MERN network if missing
+      ansible.builtin.command:
+        cmd: docker network create mern-network
+      when: mern_network.rc != 0
+
+    - name: Validate production Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose -f compose.production.yml config --quiet
+        chdir: "{{ app_dir }}"
+      changed_when: false
+
+    - name: Deploy MERN application
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        files:
+          - compose.production.yml
+        project_name: mern-todo
+        state: present
+        build: always
+        recreate: auto
+      register: deployment
+
+    - name: Wait for frontend port
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 18081
+        delay: 2
+        timeout: 90
+
+    - name: Wait for backend port
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 18082
+        delay: 2
+        timeout: 90
+
+    - name: Check frontend HTTP response
+      ansible.builtin.uri:
+        url: http://127.0.0.1:18081/
+        status_code: 200
+        return_content: false
+      register: frontend_check
+      retries: 5
+      delay: 3
+      until: frontend_check is succeeded
+
+    - name: Show deployment result
+      ansible.builtin.debug:
+        msg: "MERN Todo deployment tasks completed."

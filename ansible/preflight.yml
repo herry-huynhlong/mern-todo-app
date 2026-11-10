@@ -1,0 +1,90 @@
+---
+- name: deloy
+  hosts: vps
+  become: true
+  gather_facts: true
+
+  vars:
+    app_dir: /home/ubuntu/mern-todo-app
+    required_ports:
+      - 18081
+      - 18082
+
+  tasks:
+    - name: Check Docker installation
+      ansible.builtin.command:
+        cmd: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Display Docker version
+      ansible.builtin.debug:
+        var: docker_version.stdout
+
+    - name: Check Docker Compose installation
+      ansible.builtin.command:
+        cmd: docker compose version
+      register: compose_version
+      changed_when: false
+
+    - name: Display Docker Compose version
+      ansible.builtin.debug:
+        var: compose_version.stdout
+
+    - name: Check MongoDB Docker volume
+      ansible.builtin.command:
+        cmd: docker volume inspect mern_mongo_data
+      register: mongo_volume
+      changed_when: false
+      failed_when: false
+
+    - name: Display volume status
+      ansible.builtin.debug:
+        msg: >-
+          MongoDB volume exists:
+          {{ mongo_volume.rc == 0 }}
+
+    - name: Check MERN Docker network
+      ansible.builtin.command:
+        cmd: docker network inspect mern-network
+      register: mern_network
+      changed_when: false
+      failed_when: false
+
+    - name: Display network status
+      ansible.builtin.debug:
+        msg: >-
+          MERN network exists:
+          {{ mern_network.rc == 0 }}
+
+    - name: Check TCP listeners
+      ansible.builtin.command:
+        cmd: ss -lnt
+      register: tcp_listeners
+      changed_when: false
+
+    - name: Verify proposed application ports are free
+      ansible.builtin.assert:
+        that:
+          - >-
+            tcp_listeners.stdout
+            | regex_search('(?m)^LISTEN\s+\d+\s+\d+\s+\S+:' ~ (item | string) ~ '\s')
+            is none
+        fail_msg: "Port {{ item }} is already in use."
+        success_msg: "Port {{ item }} is available."
+      loop: "{{ required_ports }}"
+
+    - name: Check application directory
+      ansible.builtin.stat:
+        path: "{{ app_dir }}"
+      register: app_directory
+
+    - name: Display application directory status
+      ansible.builtin.debug:
+        msg: >-
+          Application directory exists:
+          {{ app_directory.stat.exists }}
+
+    - name: Preflight completed
+      ansible.builtin.debug:
+        msg: "MERN deployment preflight checks completed."
