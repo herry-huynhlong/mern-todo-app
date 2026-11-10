@@ -1,0 +1,22 @@
+# Ansible
+ansible/inventory.ini
+
+# SSH private keys
+*.pem
+*.key
+
+# Environment variables
+.env
+.env.*
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# Build output
+build/
+dist/
+
+# macOS metadata
+__MACOSX/
+.DS_Store
