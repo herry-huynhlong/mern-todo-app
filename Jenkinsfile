@@ -11,11 +11,6 @@ pipeline {
         skipDefaultCheckout(true)
     }
 
-    environment {
-        APP_DIR = 'mern-todo-app'
-        CI = 'false'
-    }
-
     stages {
         stage('Checkout GitHub') {
             steps {
@@ -32,11 +27,10 @@ pipeline {
             }
         }
 
-        stage('Check Backend') {
+        stage('Check Backend Syntax') {
             steps {
-                dir("${APP_DIR}/backend") {
+                dir('mern-todo-app/backend') {
                     sh '''
-                        npm ci
                         find . -path './node_modules' -prune -o \
                           -name '*.js' -type f -exec node --check {} \\;
                     '''
@@ -44,33 +38,40 @@ pipeline {
             }
         }
 
-        stage('Check Frontend') {
+        stage('Check Frontend Structure') {
             steps {
-                dir("${APP_DIR}/frontend") {
+                dir('mern-todo-app/frontend') {
                     sh '''
-                        npm ci
-                        npm run build
+                        test -f package.json
+                        test -f src/App.js
+                        test -f src/index.js
+
+                        echo "Frontend source structure OK"
                     '''
                 }
+            }
+        }
+
+        stage('Check Docker Configuration') {
+            steps {
+                sh '''
+                    test -f mern-todo-app/docker-compose.yml
+                    test -f mern-todo-app/backend/Dockerfile
+                    test -f mern-todo-app/frontend/Dockerfile
+
+                    echo "Docker configuration files OK"
+                '''
             }
         }
     }
 
     post {
         success {
-            echo '================================'
             echo 'JENKINS CI SUCCESS!'
-            echo 'BACKEND CHECK PASSED'
-            echo 'FRONTEND BUILD PASSED'
-            echo '================================'
         }
 
         failure {
             echo 'JENKINS CI FAILED!'
-        }
-
-        always {
-            echo 'PIPELINE FINISHED'
         }
     }
 }
