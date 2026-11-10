@@ -5,7 +5,6 @@ pipeline {
         nodejs 'NodeJS-22'
     }
 
-    
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -13,124 +12,65 @@ pipeline {
     }
 
     environment {
-        APP_NAME = 'mern-todo-backend'
         APP_DIR = 'mern-todo-app'
         CI = 'false'
     }
 
     stages {
-
         stage('Checkout GitHub') {
             steps {
-                echo '========== CHECKOUT SOURCE =========='
                 checkout scm
             }
         }
 
         stage('Check Environment') {
             steps {
-                echo '========== CHECK ENVIRONMENT =========='
-
                 sh '''
                     node --version
                     npm --version
-                    pm2 --version
                 '''
             }
         }
 
-        stage('Install Backend Dependencies') {
+        stage('Check Backend') {
             steps {
-                echo '========== INSTALL BACKEND DEPENDENCIES =========='
-
                 dir("${APP_DIR}/backend") {
                     sh '''
-                        if [ -f package-lock.json ]; then
-                            npm ci
-                        else
-                            npm install
-                        fi
+                        npm ci
+                        find . -path './node_modules' -prune -o \
+                          -name '*.js' -type f -exec node --check {} \\;
                     '''
                 }
             }
         }
 
-        stage('Install Frontend Dependencies') {
+        stage('Check Frontend') {
             steps {
-                echo '========== INSTALL FRONTEND DEPENDENCIES =========='
-
                 dir("${APP_DIR}/frontend") {
                     sh '''
-                        if [ -f package-lock.json ]; then
-                            npm ci
-                        else
-                            npm install
-                        fi
-                    '''
-                }
-            }
-        }
-
-        stage('Build Frontend') {
-            steps {
-                echo '========== BUILD REACT FRONTEND =========='
-
-                dir("${APP_DIR}/frontend") {
-                    sh '''
+                        npm ci
                         npm run build
                     '''
                 }
-            }
-        }
-
-        stage('Deploy Backend') {
-            steps {
-                echo '========== DEPLOY NODEJS BACKEND =========='
-
-                dir("${APP_DIR}/backend") {
-                    sh '''
-                        if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
-                            echo "Restarting backend..."
-                            pm2 restart "$APP_NAME" --update-env
-                        else
-                            echo "Starting backend..."
-                            pm2 start server.js --name "$APP_NAME"
-                        fi
-
-                        pm2 save
-                    '''
-                }
-            }
-        }
-
-        stage('Check Deployment') {
-            steps {
-                echo '========== CHECK DEPLOYMENT =========='
-
-                sh '''
-                    pm2 list
-                '''
             }
         }
     }
 
     post {
         success {
-            echo '========================================'
-            echo 'JENKINS PIPELINE SUCCESS!'
-            echo 'BACKEND DEPLOYED SUCCESSFULLY!'
-            echo '========================================'
+            echo '================================'
+            echo 'JENKINS CI SUCCESS!'
+            echo 'BACKEND CHECK PASSED'
+            echo 'FRONTEND BUILD PASSED'
+            echo '================================'
         }
 
         failure {
-            echo '========================================'
-            echo 'JENKINS PIPELINE FAILE!'
-            echo 'PLEASE CHECK CONSOLE OUTPUT'
-            echo '========================================'
+            echo 'JENKINS CI FAILED!'
         }
 
         always {
-            echo '========== PIPELINE FINISHED =========='
+            echo 'PIPELINE FINISHED'
         }
     }
 }

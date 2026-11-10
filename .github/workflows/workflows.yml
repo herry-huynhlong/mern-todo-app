@@ -1,22 +1,45 @@
-name: Workflow
+name: MERN Todo CI
 
 on:
-    push: 
-        branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
-env: 
-    abc: "Long"
-
-
-    
 jobs:
-    check:
-        runs-on: ubuntu-latest
+  check:
+    name: Check MERN Source
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: check
-              run: |
-               ls -la
-               pwd
-               whoami
-            
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            mern-todo-app/backend/package-lock.json
+            mern-todo-app/frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: mern-todo-app/backend
+        run: npm ci
+
+      - name: Check backend syntax
+        working-directory: mern-todo-app/backend
+        run: |
+          find . -path './node_modules' -prune -o \
+            -name '*.js' -type f -exec node --check {} \;
+
+      - name: Install frontend dependencies
+        working-directory: mern-todo-app/frontend
+        run: npm ci
+
+      - name: Build React frontend
+        working-directory: mern-todo-app/frontend
+        env:
+          CI: 'false'
+        run: npm run build
