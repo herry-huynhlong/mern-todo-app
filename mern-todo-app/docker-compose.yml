@@ -27,7 +27,6 @@ services:
       - mongodb
     networks:
       - mern-network
-
   frontend:
     build:
       context: ./frontend
