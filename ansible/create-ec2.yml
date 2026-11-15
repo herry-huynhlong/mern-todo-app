@@ -21,6 +21,7 @@
         wait: true
       register: ec2
 
+      
     - name: Show EC2 Public IP
       ansible.builtin.debug:
         msg: "EC2 Public IP: {{ ec2.instances[0].public_ip_address }}"
