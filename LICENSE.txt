@@ -50,7 +50,7 @@ Notice
 
 Business Source License 1.1
 
-Terms
+Term
 
 The Licensor hereby grants you the right to copy, modify, create derivative
 works, redistribute, and make non-production use of the Licensed Work. The
