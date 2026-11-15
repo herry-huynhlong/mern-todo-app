@@ -48,8 +48,7 @@ please contact licensing@hashicorp.com.
 
 Notice
 
-Business Source License 1.1
-
+Business Source License 1.
 Term
 
 The Licensor hereby grants you the right to copy, modify, create derivative
